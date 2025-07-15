@@ -109,6 +109,7 @@ $data | ConvertTo-Json -Depth 3 | Out-File -Encoding UTF8 earthquake_data.json
 ## 🗺️ [Mermaid Workflow](#mermaid-workflow)
 
 ```mermaid
+
 flowchart TD
   Start["Start App"] --> Upload{Upload JSON or Simulate?}
   Upload -- Simulated --> Sim[Generate 200 rows]
@@ -120,7 +121,6 @@ flowchart TD
   Forest --> Plot3[3D Plot (plotly)]
   Forest --> Plot4[Map (leaflet)]
   Forest --> Table[Historical Table (DT)]
-```
 
 ---
 
