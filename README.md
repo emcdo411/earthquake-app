@@ -131,7 +131,40 @@ simulate_api_data <- function(n_rows = 200) {
 
 ui <- fluidPage(
   useShinyjs(),
-  titlePanel("Earthquake Warning System"),
+  tags$head(
+    tags$style(HTML("
+      body {
+        background-color: #121212;
+        color: #f0f0f0;
+      }
+      .well, .panel, .form-control, .selectize-input, .input-group {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+        border-color: #333333 !important;
+      }
+      .tabbable > .nav-tabs > li > a {
+        background-color: #2a2a2a;
+        color: #ffffff;
+        border: 1px solid #444;
+      }
+      .tab-content {
+        background-color: #1e1e1e;
+        color: #ffffff;
+        padding: 10px;
+        border: 1px solid #444;
+      }
+      .dataTables_wrapper .dataTables_filter label,
+      .dataTables_wrapper .dataTables_info,
+      .dataTables_wrapper .dataTables_paginate {
+        color: white !important;
+      }
+      .paginate_button {
+        background-color: #2a2a2a !important;
+        color: white !important;
+      }
+    "))
+  ),
+  titlePanel("🌍 Earthquake Warning System"),
   sidebarLayout(
     sidebarPanel(
       sliderInput("threshold", "Anomaly Score Threshold", min = 0, max = 1, value = 0.85, step = 0.01),
@@ -155,8 +188,7 @@ server <- function(input, output, session) {
     file <- input$uploadData
     raw_json <- readLines(file$datapath, warn = FALSE)
     raw_json[1] <- sub("^\uFEFF", "", raw_json[1])
-    data <- fromJSON(paste(raw_json, collapse = ""), simplifyDataFrame = TRUE) %>% as_tibble()
-    data
+    fromJSON(paste(raw_json, collapse = ""), simplifyDataFrame = TRUE) %>% as_tibble()
   })
   
   data <- reactive({
@@ -186,9 +218,10 @@ server <- function(input, output, session) {
   
   output$ggplotPlot <- renderPlot({
     df <- tryCatch(req(filtered_data()), error = function(e) NULL)
-    if (is.null(df) || !is.data.frame(df) || nrow(df) < 2) {
-      validate(need(FALSE, "Anomaly Score plot requires at least 2 valid rows of data."))
-    }
+    if (is.null(df)) validate(need(FALSE, "No data available."))
+    if (nrow(df) < 2) validate(need(FALSE, "Need at least 2 rows."))
+    if (!"AnomalyScore" %in% names(df)) validate(need(FALSE, "Missing AnomalyScore."))
+    
     ggplot(df, aes(seq_along(AnomalyScore), AnomalyScore)) +
       geom_point(color = "#FFA500", size = 4) +
       geom_line(color = "#FFA500", linewidth = 1.5) +
@@ -199,16 +232,15 @@ server <- function(input, output, session) {
   
   output$heatmapPlot <- renderPlot({
     df <- tryCatch(req(filtered_data()), error = function(e) NULL)
-    if (is.null(df) || !is.data.frame(df) || nrow(df) < 2) {
-      validate(need(FALSE, "Heatmap requires at least 2 valid rows of data."))
-    }
+    if (is.null(df)) validate(need(FALSE, "No data available."))
+    if (nrow(df) < 2) validate(need(FALSE, "Need at least 2 rows."))
+    if (!any(startsWith(names(df), "Sensor"))) validate(need(FALSE, "Missing sensor columns."))
+    
     sensor_data <- df %>% select(starts_with("Sensor"))
     sensor_data <- sensor_data[, apply(sensor_data, 2, sd, na.rm = TRUE) != 0]
-    if (ncol(sensor_data) < 2) {
-      validate(need(FALSE, "Not enough varied sensor data to generate a heatmap."))
-    }
-    cor_matrix <- cor(sensor_data, use = "complete.obs")
-    melted_cor <- melt(cor_matrix)
+    if (ncol(sensor_data) < 2) validate(need(FALSE, "Not enough varied sensor data."))
+    
+    melted_cor <- melt(cor(sensor_data, use = "complete.obs"))
     ggplot(melted_cor, aes(Var1, Var2, fill = value)) +
       geom_tile() +
       scale_fill_gradientn(colors = c("#000000", "#FFA500", "#FF2400")) +
@@ -218,9 +250,9 @@ server <- function(input, output, session) {
   
   output$plotly3D <- renderPlotly({
     df <- tryCatch(req(filtered_data()), error = function(e) NULL)
-    if (is.null(df) || !is.data.frame(df) || nrow(df) < 2) {
-      validate(need(FALSE, "3D Sensor plot requires at least 2 valid rows of data."))
-    }
+    if (is.null(df) || nrow(df) < 2) validate(need(FALSE, "Need at least 2 rows."))
+    if (!all(c("Sensor1", "Sensor2", "Sensor3") %in% names(df))) validate(need(FALSE, "Required sensors missing."))
+    
     plot_ly(
       data = df,
       x = ~Sensor1,
@@ -235,12 +267,11 @@ server <- function(input, output, session) {
   
   output$mapPlot <- renderLeaflet({
     df <- tryCatch(req(filtered_data()), error = function(e) NULL)
-    if (is.null(df) || !is.data.frame(df) || nrow(df) < 2) {
-      validate(need(FALSE, "Map requires at least 2 valid rows of data."))
-    }
+    if (is.null(df) || nrow(df) < 2) validate(need(FALSE, "Need at least 2 rows."))
+    if (!all(c("Latitude", "Longitude") %in% names(df))) validate(need(FALSE, "Missing lat/lon."))
     
     leaflet(df) %>%
-      addProviderTiles(providers$CartoDB.Positron) %>%
+      addProviderTiles(providers$CartoDB.DarkMatter) %>%
       addCircleMarkers(
         lng = ~Longitude,
         lat = ~Latitude,
@@ -256,11 +287,22 @@ server <- function(input, output, session) {
   
   output$dataTable <- renderDT({
     df <- req(filtered_data())
-    datatable(df, options = list(pageLength = 10))
+    datatable(
+      df,
+      options = list(pageLength = 10, autoWidth = TRUE),
+      rownames = FALSE,
+      class = 'stripe hover row-border'
+    ) %>%
+      formatStyle(
+        columns = names(df),
+        color = '#ffffff',
+        backgroundColor = '#1e1e1e'
+      )
   })
 }
 
 shinyApp(ui, server)
+
 
 ```
 
