@@ -109,18 +109,29 @@ $data | ConvertTo-Json -Depth 3 | Out-File -Encoding UTF8 earthquake_data.json
 ## 🗺️ [Mermaid Workflow](#mermaid-workflow)
 
 ```mermaid
-
 flowchart TD
-  Start["Start App"] --> Upload{Upload JSON or Simulate?}
-  Upload -- Simulated --> Sim[Generate 200 rows]
-  Upload -- Uploaded --> Valid[Validate JSON + UTF-8 fix]
-  Sim --> Forest[Anomaly Detection (Isolation Forest)]
+  Start --> Upload
+  Upload -->|Simulated| Sim
+  Upload -->|Uploaded| Valid
+  Sim --> Forest
   Valid --> Forest
-  Forest --> Plot1[Anomaly Score Stream (ggplot2)]
-  Forest --> Plot2[Heatmap (reshape2)]
-  Forest --> Plot3[3D Plot (plotly)]
-  Forest --> Plot4[Map (leaflet)]
-  Forest --> Table[Historical Table (DT)]
+  Forest --> Plot1
+  Forest --> Plot2
+  Forest --> Plot3
+  Forest --> Plot4
+  Forest --> Table
+
+  Start["Start App"]
+  Upload{Upload JSON or Simulate?}
+  Sim["Generate 200 rows"]
+  Valid["Validate JSON + UTF-8 fix"]
+  Forest["Anomaly Detection (Isolation Forest)"]
+  Plot1["Anomaly Score Stream (ggplot2)"]
+  Plot2["Heatmap (reshape2)"]
+  Plot3["3D Plot (plotly)"]
+  Plot4["Map (leaflet)"]
+  Table["Historical Table (DT)"]
+```
 
 ---
 
@@ -148,3 +159,4 @@ If you’re new to software or data development:
 Let me know what you think, Myles!
 
 ---
+
